@@ -40,8 +40,9 @@ void displayResults()
 {
   refreshLCD();
   lcdWait();
-
-  lcdPrintLine3(elapsedTime);
+  lcdPrintLine2(trapSpeed);  
+  lcdWait();
+  lcdPrintLine3(elapsedRaceTime);
   lcdWait();
   lcdPrintLine4("               Reset");
 }

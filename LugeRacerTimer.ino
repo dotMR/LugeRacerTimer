@@ -30,6 +30,8 @@ const int BUFFER_LENGTH = 200;
 const int SENSITIVITY_VAL = 60;
 const int NUM_READS_REQUIRED = 5;
 
+const int SENSOR_DISTANCE = 36; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
+const long INCHES_PER_MILE = 63360;
 const int SECONDS_PER_HOUR = 3600;
 
 // ---------- STATES ---------- //
@@ -51,10 +53,12 @@ SoftwareSerial display(PIN_LCD1, PIN_LCD2); // RX, TX
 
 // For timing
 boolean timerRunning = false;
-unsigned long startTime;  // the time in millis at the time the system tells a racer to go
+unsigned long startTime;  // the time in millis when the system tells a racer to go (green light)
+unsigned long trapTime; // the time in millis when the trap event is received
 unsigned long endTime;  // the time in millis that a "finish line" trigger event is received
-unsigned long trapTime;
-float elapsedTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
+float elapsedRaceTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
+float elapsedTrapTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
+float trapSpeed;  // calculated racer speed between trap and end sensor
 
 // used for finish line
 int voltageBuffer_finishLine[BUFFER_LENGTH];
@@ -157,13 +161,30 @@ void loop()
 
     case(STATE_TIMER_STOPPED):
     {
-      elapsedTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
+      elapsedRaceTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
+      elapsedTrapTime = (float)endTime - (float)trapTime;
+
+      Serial.print("(float)startTime: ");
+      Serial.print((float) startTime);
+      Serial.print("(float)trapTime: ");
+      Serial.print((float) trapTime);
+      Serial.print("(float)endTime: ");
+      Serial.println((float) endTime);
+      Serial.print("elapsed trap time: ");
+      Serial.println(elapsedTrapTime);
+      Serial.print("elapsed time: ");
+      Serial.println(elapsedRaceTime);
+
+      // calculate miles per hour from inches per second
+      float inchesPerSecond = SENSOR_DISTANCE / elapsedTrapTime;
+      float milesPerSecond = inchesPerSecond / INCHES_PER_MILE;
+      trapSpeed = milesPerSecond * SECONDS_PER_HOUR;
 
       displayResults();
 
-      if(elapsedTime <= 2) {
+      if(elapsedRaceTime <= 2) {
         Serial.print(" Time found: ");
-        Serial.println(elapsedTime);
+        Serial.println(elapsedRaceTime);
         Serial.print(" At buffer value: ");
         Serial.println(bufferIndex_finishLine);
         Serial.print(" # of samples @ end: ");
@@ -261,21 +282,21 @@ long monitorSensors() // returns end time in millis
       bufferIndex_finishLine++;
       if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;
 
-        if(abs(currentVoltage_finishLine-avgVoltage_finishLine) > SENSITIVITY_VAL)
+      if(abs(currentVoltage_finishLine-avgVoltage_finishLine) > SENSITIVITY_VAL)
+      {
+        if(i==NUM_READS_REQUIRED)
         {
-          if(i==NUM_READS_REQUIRED)
-          {
-            exit = true;
-            endTriggered = true;
-          }
+          exit = true;
+          endTriggered = true;
         }
-        else
-          break;
+      }
+      else
+        break;
     }
 
     if(!endTriggered)
     {
-      // calc avg voltage
+      // recalculate avg voltage if still monitoring sensor
       bufferSum_finishLine = 0;
       for(int i=0;i<BUFFER_LENGTH;i++)
       {
@@ -380,19 +401,22 @@ void resetVoltageBuffers()
 {
   for(int i=0;i<BUFFER_LENGTH;i++)
   {
+    voltageBuffer_trap[i] = analogRead(PIN_TRAP_SENSOR);
     voltageBuffer_finishLine[i] = analogRead(PIN_END_SENSOR);
     delay(5);
   }
 
+  bufferSum_trap = 0;
   bufferSum_finishLine = 0;
 
   for(int i=0;i<BUFFER_LENGTH;i++)
   {
+    bufferSum_trap+=voltageBuffer_trap[i];
     bufferSum_finishLine+=voltageBuffer_finishLine[i];
   }
 
+  avgVoltage_trap = bufferSum_trap / BUFFER_LENGTH;
   avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
-
 }
 
 void runDiagnosticLoop()
@@ -478,6 +502,10 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
+
+
+
 
 
 
