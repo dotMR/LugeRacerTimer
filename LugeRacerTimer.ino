@@ -214,10 +214,17 @@ long monitorSensors() // returns end time in millis
   {
     if(!trapTriggered)
     {
+      // watch trap sensor for consecutive reads
       for(int i=1;i=NUM_READS_REQUIRED;i++)
       {
+        // read voltage and update buffer
         currentVoltage_trap = analogRead(PIN_TRAP_SENSOR);
+        voltageBuffer_trap[bufferIndex_trap] = currentVoltage_trap;
         totalTrapSamples++;
+
+        // update rolling buffer index
+        bufferIndex_trap++;
+        if(bufferIndex_trap >= BUFFER_LENGTH) bufferIndex_trap = 0;
 
         if(abs(currentVoltage_trap-avgVoltage_trap) > SENSITIVITY_VAL)
         {
@@ -231,44 +238,43 @@ long monitorSensors() // returns end time in millis
           break;
       }
 
+      // recalculate avg voltage if still monitoring sensor
       if(!trapTriggered)
       {
-        voltageBuffer_trap[bufferIndex_trap] = currentVoltage_trap;
-
-        // calc avg voltage
         bufferSum_trap = 0;
         for(int i=0;i<BUFFER_LENGTH;i++)
         {
           bufferSum_trap+=voltageBuffer_trap[i];
         }
         avgVoltage_trap = bufferSum_trap / BUFFER_LENGTH;
-
-        // handle rolling buffer index
-        bufferIndex_trap++;
-        if(bufferIndex_trap >= BUFFER_LENGTH) bufferIndex_trap = 0;
       }
     }
 
-    // watch for consecutive analog reads @ finish line
+    // now check for consecutive analog reads @ finish line
     for(int i=1;i=NUM_READS_REQUIRED;i++)
     {
       currentVoltage_finishLine = analogRead(PIN_END_SENSOR);
+      voltageBuffer_finishLine[bufferIndex_finishLine] = currentVoltage_finishLine;
       totalEndSamples++;
 
-      if(abs(currentVoltage_finishLine-avgVoltage_finishLine) < SENSITIVITY_VAL)
-        break;
-      else
-        if(i==NUM_READS_REQUIRED)
+      // handle rolling buffer index
+      bufferIndex_finishLine++;
+      if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;
+
+        if(abs(currentVoltage_finishLine-avgVoltage_finishLine) > SENSITIVITY_VAL)
         {
-          endTriggered = true;
-          exit = true;
+          if(i==NUM_READS_REQUIRED)
+          {
+            exit = true;
+            endTriggered = true;
+          }
         }
+        else
+          break;
     }
 
     if(!endTriggered)
     {
-      voltageBuffer_finishLine[bufferIndex_finishLine] = currentVoltage_finishLine;
-
       // calc avg voltage
       bufferSum_finishLine = 0;
       for(int i=0;i<BUFFER_LENGTH;i++)
@@ -276,10 +282,6 @@ long monitorSensors() // returns end time in millis
         bufferSum_finishLine+=voltageBuffer_finishLine[i];
       }
       avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
-
-      // handle rolling buffer index
-      bufferIndex_finishLine++;
-      if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;
     }
   }
 
@@ -476,6 +478,10 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
+
+
+
 
 
 
