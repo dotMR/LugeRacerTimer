@@ -22,12 +22,14 @@ const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 
 const byte PIN_LED =  13;  // the built-in debugging LED
 
-const byte PIN_SENSOR_ANALOG1 = A0;
-const byte PIN_SENSOR_ANALOG2 = A1;
+const byte PIN_END_SENSOR = A0;
+const byte PIN_TRAP_SENSOR = A1;
 
 // ---------- SENSOR CONSTANTS ---------- //
 const int BUFFER_LENGTH = 200;
 const int SENSITIVITY_VAL = 60;
+const int NUM_READS_REQUIRED = 5;
+
 const int SECONDS_PER_HOUR = 3600;
 
 // ---------- STATES ---------- //
@@ -51,16 +53,24 @@ SoftwareSerial display(PIN_LCD1, PIN_LCD2); // RX, TX
 boolean timerRunning = false;
 unsigned long startTime;  // the time in millis at the time the system tells a racer to go
 unsigned long endTime;  // the time in millis that a "finish line" trigger event is received
+unsigned long trapTime;
 float elapsedTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
 
-unsigned long totalSamples = 0;
+// used for finish line
+int voltageBuffer_finishLine[BUFFER_LENGTH];
+int avgVoltage_finishLine = 0;
+int bufferIndex_finishLine = 0;
+int currentVoltage_finishLine = 0;
+unsigned long bufferSum_finishLine = 0;
+unsigned long totalEndSamples = 0;
 
-// For sensor 1, the finish sensor
-int voltageValueBuffer[BUFFER_LENGTH];
-int avgVoltageValue = 0;
-int bufferIndex = 0;
-int currentVoltageValue = 0;
-unsigned long totalVoltageValue = 0;
+// the trap sensor (uphill)
+int voltageBuffer_trap[BUFFER_LENGTH];
+int avgVoltage_trap = 0;
+int bufferIndex_trap = 0;
+int currentVoltage_trap = 0;
+unsigned long bufferSum_trap = 0;
+unsigned long totalTrapSamples = 0;
 
 void setup()
 {
@@ -81,9 +91,10 @@ void setup()
   pinMode(PIN_RED_LED3, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_SENSOR_ANALOG1, INPUT);
-  pinMode(PIN_SENSOR_ANALOG2, INPUT);
   pinMode(PIN_BUZZER, OUTPUT);
+
+  pinMode(PIN_END_SENSOR, INPUT);
+  pinMode(PIN_TRAP_SENSOR, INPUT);
 
   // Beep to announce ready
   blinkPin(PIN_BUZZER, 1, 200, false);
@@ -138,7 +149,7 @@ void loop()
 
     case(STATE_TIMER_RUNNING):
     {
-      endTime = monitorEndSensor();
+      endTime = monitorSensors();
       blinkPin(PIN_BUZZER, 2, 100, true);
       currentState = STATE_TIMER_STOPPED;
       break;
@@ -154,9 +165,9 @@ void loop()
         Serial.print(" Time found: ");
         Serial.println(elapsedTime);
         Serial.print(" At buffer value: ");
-        Serial.println(bufferIndex);
-        Serial.print(" # of samples: ");
-        Serial.println(totalSamples);
+        Serial.println(bufferIndex_finishLine);
+        Serial.print(" # of samples @ end: ");
+        Serial.println(totalEndSamples);
 
         Serial.println("Buffer values: ");
         for(int i=0;i<BUFFER_LENGTH;i++)
@@ -164,7 +175,7 @@ void loop()
           Serial.print("[");
           Serial.print(i);
           Serial.print("]: ");
-          Serial.println(voltageValueBuffer[i]);
+          Serial.println(voltageBuffer_finishLine[i]);
         }
       }
 
@@ -191,63 +202,87 @@ void loop()
 // ----------------------------------------
 // Polling Methods
 // ----------------------------------------
-
-long monitorEndSensor() // returns trap time in millis
+long monitorSensors() // returns end time in millis
 {
-  boolean trigger = false;
-  totalSamples = 0;
-  while(!trigger)
+  boolean endTriggered, trapTriggered, exit = false;
+  totalEndSamples, totalTrapSamples = 0;
+
+  // monitor trap & end sensor in succession
+  // watch for 'n' consecutive analog reads above the set sensitivity value to indicate a trigger
+
+  while(!exit)
   {
-    currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-    totalSamples++;
-
-    if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+    if(!trapTriggered)
     {
-      currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-      totalSamples++;
-
-      if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+      for(int i=1;i=NUM_READS_REQUIRED;i++)
       {
-        currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-        totalSamples++;
+        currentVoltage_trap = analogRead(PIN_TRAP_SENSOR);
+        totalTrapSamples++;
 
-        if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+        if(abs(currentVoltage_trap-avgVoltage_trap) > SENSITIVITY_VAL)
         {
-          currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-          totalSamples++;
-
-          if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+          if(i==NUM_READS_REQUIRED)
           {
-            currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-            totalSamples++;
-
-            if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
-            {
-              trigger = true;
-            }
+            trapTime = millis();
+            trapTriggered = true;
           }
         }
+        else
+          break;
+      }
+
+      if(!trapTriggered)
+      {
+        voltageBuffer_trap[bufferIndex_trap] = currentVoltage_trap;
+
+        // calc avg voltage
+        bufferSum_trap = 0;
+        for(int i=0;i<BUFFER_LENGTH;i++)
+        {
+          bufferSum_trap+=voltageBuffer_trap[i];
+        }
+        avgVoltage_trap = bufferSum_trap / BUFFER_LENGTH;
+
+        // handle rolling buffer index
+        bufferIndex_trap++;
+        if(bufferIndex_trap >= BUFFER_LENGTH) bufferIndex_trap = 0;
       }
     }
-    else
-    {
-      voltageValueBuffer[bufferIndex] = currentVoltageValue;
-      totalVoltageValue = 0;
 
+    // watch for consecutive analog reads @ finish line
+    for(int i=1;i=NUM_READS_REQUIRED;i++)
+    {
+      currentVoltage_finishLine = analogRead(PIN_END_SENSOR);
+      totalEndSamples++;
+
+      if(abs(currentVoltage_finishLine-avgVoltage_finishLine) < SENSITIVITY_VAL)
+        break;
+      else
+        if(i==NUM_READS_REQUIRED)
+        {
+          endTriggered = true;
+          exit = true;
+        }
+    }
+
+    if(!endTriggered)
+    {
+      voltageBuffer_finishLine[bufferIndex_finishLine] = currentVoltage_finishLine;
+
+      // calc avg voltage
+      bufferSum_finishLine = 0;
       for(int i=0;i<BUFFER_LENGTH;i++)
       {
-        totalVoltageValue+=voltageValueBuffer[i];
+        bufferSum_finishLine+=voltageBuffer_finishLine[i];
       }
+      avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
 
-      avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
-
-      bufferIndex++;
-      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
-
-      if(RUN_EXPRESS && (totalSamples > 5000)) 
-        trigger = true;
+      // handle rolling buffer index
+      bufferIndex_finishLine++;
+      if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;
     }
   }
+
   return millis();
 }
 
@@ -343,18 +378,18 @@ void resetVoltageBuffers()
 {
   for(int i=0;i<BUFFER_LENGTH;i++)
   {
-    voltageValueBuffer[i] = analogRead(PIN_SENSOR_ANALOG1);
+    voltageBuffer_finishLine[i] = analogRead(PIN_END_SENSOR);
     delay(5);
   }
 
-  totalVoltageValue = 0;
+  bufferSum_finishLine = 0;
 
   for(int i=0;i<BUFFER_LENGTH;i++)
   {
-    totalVoltageValue+=voltageValueBuffer[i];
+    bufferSum_finishLine+=voltageBuffer_finishLine[i];
   }
 
-  avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
+  avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
 
 }
 
@@ -384,39 +419,39 @@ void runDiagnosticLoop()
   // Listen for arcade button to escape the diagnostic state
   while(digitalRead(PIN_GREEN_ARCADE_BUTTON) != LOW)
   {
-    currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
+    currentVoltage_finishLine = analogRead(PIN_END_SENSOR);
 
-    if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+    if(abs(currentVoltage_finishLine-avgVoltage_finishLine) > SENSITIVITY_VAL)
     {
       blinkPin(PIN_BUZZER, 3, 100, false);
-      lcdPrintLine2(currentVoltageValue);
-      lcdPrintLine3(avgVoltageValue);
+      lcdPrintLine2(currentVoltage_finishLine);
+      lcdPrintLine3(avgVoltage_finishLine);
       resetVoltageBuffers();
       delay(3000);
       blinkPin(PIN_BUZZER, 1, 100, false);      
     }
     else
     {
-      voltageValueBuffer[bufferIndex] = currentVoltageValue;
+      voltageBuffer_finishLine[bufferIndex_finishLine] = currentVoltage_finishLine;
 
-      totalVoltageValue = 0;
+      bufferSum_finishLine = 0;
 
       for(int i=0;i<BUFFER_LENGTH;i++)
       {
-        totalVoltageValue+=voltageValueBuffer[i];
+        bufferSum_finishLine+=voltageBuffer_finishLine[i];
       }
 
-      avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
+      avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
 
-      bufferIndex++;
-      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
+      bufferIndex_finishLine++;
+      if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;  
     }
 
     if(monitorLoopCount++ >= 750)
     {
       // display analog sensor values
-      lcdPrintLine2(currentVoltageValue);
-      lcdPrintLine3(avgVoltageValue);
+      lcdPrintLine2(currentVoltage_finishLine);
+      lcdPrintLine3(avgVoltage_finishLine);
       monitorLoopCount = 0;
     }
   }
@@ -441,6 +476,16 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
