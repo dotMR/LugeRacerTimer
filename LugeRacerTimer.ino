@@ -55,10 +55,14 @@ SoftwareSerial display(PIN_LCD1, PIN_LCD2); // RX, TX
 boolean timerRunning = false;
 unsigned long startTime;  // the time in millis when the system tells a racer to go (green light)
 unsigned long trapTime; // the time in millis when the trap event is received
-unsigned long endTime;  // the time in millis that a "finish line" trigger event is received
-float elapsedRaceTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
-float elapsedTrapTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
-float trapSpeed;  // calculated racer speed between trap and end sensor
+unsigned long endTime;  // the time in millis the finish event is received
+
+float calcTrapTime;  // the elapsed time between the trap sensor and finish line
+float calcRaceTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
+
+float calcInchesPerSecond; // calculated speed racer traveled through the trap
+float calcMilesPerSecond; // calculated speed racer traveled through the trap
+float calcMPH; // calculated speed racer traveled through the trap
 
 // used for finish line
 int voltageBuffer_finishLine[BUFFER_LENGTH];
@@ -114,7 +118,8 @@ void setup()
   {
     currentState = STATE_DIAGNOSTIC;
   } 
-  else {
+  else
+  {
     displayTimerReady();
     currentState = STATE_RACER_SELECTED;
   }
@@ -161,24 +166,31 @@ void loop()
 
     case(STATE_TIMER_STOPPED):
     {
-      elapsedRaceTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
+      long elapsedTime = (endTime - startTime);
+      calcRaceTime = (float) elapsedTime / 1000.0;
 
-      elapsedTrapTime = 0;
+      calcTrapTime = 0;
+      calcMPH = 0;
+      calcInchesPerSecond = 0;
+      calcMilesPerSecond = 0;
+
       if(trapTime != 0)
       {
-        elapsedTrapTime = (((float)endTime) - ((float)trapTime)) / ((float)1000.0);
+        long elapsedTrap = (endTime - trapTime);
+        calcTrapTime = (float) elapsedTrap / 1000.0;
       }
 
-      Serial.print("(float)startTime: ");
-      Serial.println((float) startTime);
-      Serial.print("(float)trapTime: ");
-      Serial.println((float) trapTime);
-      Serial.print("(float)endTime: ");
-      Serial.println((float) endTime);
-      Serial.print("elapsed trap time: ");
-      Serial.println(elapsedTrapTime);
-      Serial.print("elapsed time: ");
-      Serial.println(elapsedRaceTime);
+      Serial.println(" RACE RESULTS ");
+      Serial.print("startTime: ");
+      Serial.println(startTime);
+      Serial.print("trapTime: ");
+      Serial.println(trapTime);
+      Serial.print("endTime: ");
+      Serial.println(endTime);
+      Serial.print("calcTrapTime: ");
+      Serial.println(calcTrapTime);
+      Serial.print("calcRaceTime: ");
+      Serial.println(calcRaceTime);
       Serial.print("Trap Samples: ");
       Serial.println(totalTrapSamples);
       Serial.print("End Samples: ");
@@ -186,27 +198,27 @@ void loop()
 
       // calculate miles per hour from inches per second
       // assuming trap sensor was triggered
-      if(elapsedTrapTime != 0)
+      if(calcTrapTime != 0)
       {
-        float inchesPerSecond = (float)SENSOR_DISTANCE / (float)elapsedTrapTime;
-        Serial.print("inchesPerSecond: ");
-        Serial.println(inchesPerSecond);
+        calcInchesPerSecond = (float) SENSOR_DISTANCE / calcTrapTime;
+        Serial.print("calcInchesPerSecond: ");
+        Serial.println(calcInchesPerSecond);
 
-        float milesPerSecond = (float)inchesPerSecond / (float)INCHES_PER_MILE;
-        Serial.print("milesPerSecond: ");
-        Serial.println(milesPerSecond);
+        calcMilesPerSecond = calcInchesPerSecond / (float) INCHES_PER_MILE;
+        Serial.print("calcMilesPerSecond: ");
+        Serial.println(calcMilesPerSecond);
 
-        trapSpeed = (float)milesPerSecond * (float)SECONDS_PER_HOUR;
-        Serial.print("trapSpeed: ");
-        Serial.println(trapSpeed);
+        calcMPH = calcMilesPerSecond * (float) SECONDS_PER_HOUR;
+        Serial.print("calcMPH: ");
+        Serial.println(calcMPH);
       }
 
       displayResults();
 
-      if(elapsedRaceTime <= 2)
+      if(calcRaceTime <= 2)
       {
         Serial.print(" Time found: ");
-        Serial.println(elapsedRaceTime);
+        Serial.println(calcRaceTime);
         Serial.print(" At buffer value: ");
         Serial.println(bufferIndex_finishLine);
         Serial.print(" # of samples @ end: ");
@@ -252,6 +264,8 @@ long monitorSensors() // returns end time in millis
   boolean exit = false;
   totalEndSamples = 0;
   totalTrapSamples = 0;
+  trapTime = 0;
+  endTime = 0;
 
   // monitor trap & end sensor in succession
   // watch for 'n' consecutive analog reads above the set sensitivity value to indicate a trigger
@@ -277,10 +291,13 @@ long monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
-            Serial.print("Trap Set: ");
+            Serial.println("--- TRAP FOUND ---");
+            Serial.print("Trap Time: ");
             Serial.println(trapTime);
             Serial.print("Trap Samples: ");
             Serial.println(totalTrapSamples);
+            Serial.print("End Samples: ");
+            Serial.println(totalEndSamples);
             trapTriggered = true;
             break;
           }
@@ -318,6 +335,7 @@ long monitorSensors() // returns end time in millis
         {
           exit = true;
           endTriggered = true;
+          break;
         }
       }
       else
@@ -532,6 +550,7 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
 
 
 

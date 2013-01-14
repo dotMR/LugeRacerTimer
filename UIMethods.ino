@@ -40,9 +40,18 @@ void displayResults()
 {
   refreshLCD();
   lcdWait();
-  lcdPrintLine2(trapSpeed);  
-  lcdWait();
-  lcdPrintLine3(elapsedRaceTime);
+
+  if(calcMPH != 0)
+  {
+    lcdPrintLine2(calcMPH);
+    display.print(" mph");
+    lcdWait();
+  }
+
+  lcdPrintLine3(calcRaceTime);
+  display.print(" sec");
   lcdWait();
   lcdPrintLine4("               Reset");
 }
+
+
