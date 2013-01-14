@@ -23,7 +23,7 @@ const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 const byte PIN_LED =  13;  // the built-in debugging LED
 
 const byte PIN_END_SENSOR = A0;
-const byte PIN_TRAP_SENSOR = A1;
+const byte PIN_TRAP_SENSOR = A2;
 
 // ---------- SENSOR CONSTANTS ---------- //
 const int BUFFER_LENGTH = 200;
@@ -32,7 +32,7 @@ const int NUM_READS_REQUIRED = 5;
 
 const int SENSOR_DISTANCE = 36; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
 const long INCHES_PER_MILE = 63360;
-const int SECONDS_PER_HOUR = 3600;
+const long SECONDS_PER_HOUR = 3600;
 
 // ---------- STATES ---------- //
 const byte STATE_DIAGNOSTIC = 1;
@@ -162,27 +162,49 @@ void loop()
     case(STATE_TIMER_STOPPED):
     {
       elapsedRaceTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
-      elapsedTrapTime = (float)endTime - (float)trapTime;
+
+      elapsedTrapTime = 0;
+      if(trapTime != 0)
+      {
+        elapsedTrapTime = (((float)endTime) - ((float)trapTime)) / ((float)1000.0);
+      }
 
       Serial.print("(float)startTime: ");
-      Serial.print((float) startTime);
+      Serial.println((float) startTime);
       Serial.print("(float)trapTime: ");
-      Serial.print((float) trapTime);
+      Serial.println((float) trapTime);
       Serial.print("(float)endTime: ");
       Serial.println((float) endTime);
       Serial.print("elapsed trap time: ");
       Serial.println(elapsedTrapTime);
       Serial.print("elapsed time: ");
       Serial.println(elapsedRaceTime);
+      Serial.print("Trap Samples: ");
+      Serial.println(totalTrapSamples);
+      Serial.print("End Samples: ");
+      Serial.println(totalEndSamples);
 
       // calculate miles per hour from inches per second
-      float inchesPerSecond = SENSOR_DISTANCE / elapsedTrapTime;
-      float milesPerSecond = inchesPerSecond / INCHES_PER_MILE;
-      trapSpeed = milesPerSecond * SECONDS_PER_HOUR;
+      // assuming trap sensor was triggered
+      if(elapsedTrapTime != 0)
+      {
+        float inchesPerSecond = (float)SENSOR_DISTANCE / (float)elapsedTrapTime;
+        Serial.print("inchesPerSecond: ");
+        Serial.println(inchesPerSecond);
+
+        float milesPerSecond = (float)inchesPerSecond / (float)INCHES_PER_MILE;
+        Serial.print("milesPerSecond: ");
+        Serial.println(milesPerSecond);
+
+        trapSpeed = (float)milesPerSecond * (float)SECONDS_PER_HOUR;
+        Serial.print("trapSpeed: ");
+        Serial.println(trapSpeed);
+      }
 
       displayResults();
 
-      if(elapsedRaceTime <= 2) {
+      if(elapsedRaceTime <= 2)
+      {
         Serial.print(" Time found: ");
         Serial.println(elapsedRaceTime);
         Serial.print(" At buffer value: ");
@@ -225,8 +247,11 @@ void loop()
 // ----------------------------------------
 long monitorSensors() // returns end time in millis
 {
-  boolean endTriggered, trapTriggered, exit = false;
-  totalEndSamples, totalTrapSamples = 0;
+  boolean endTriggered = false;
+  boolean trapTriggered = false;
+  boolean exit = false;
+  totalEndSamples = 0;
+  totalTrapSamples = 0;
 
   // monitor trap & end sensor in succession
   // watch for 'n' consecutive analog reads above the set sensitivity value to indicate a trigger
@@ -252,7 +277,12 @@ long monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
+            Serial.print("Trap Set: ");
+            Serial.println(trapTime);
+            Serial.print("Trap Samples: ");
+            Serial.println(totalTrapSamples);
             trapTriggered = true;
+            break;
           }
         }
         else
@@ -502,6 +532,15 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
+
+
+
+
+
+
+
+
 
 
 
