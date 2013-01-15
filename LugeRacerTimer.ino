@@ -30,7 +30,7 @@ const int BUFFER_LENGTH = 200;
 const int SENSITIVITY_VAL = 60;
 const int NUM_READS_REQUIRED = 5;
 
-const int SENSOR_DISTANCE = 36; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
+const int SENSOR_DISTANCE = 52; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
 const long INCHES_PER_MILE = 63360;
 const long SECONDS_PER_HOUR = 3600;
 
