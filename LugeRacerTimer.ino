@@ -25,6 +25,8 @@ const byte PIN_LED =  13;  // the built-in debugging LED
 const byte PIN_END_SENSOR = A0;
 const byte PIN_TRAP_SENSOR = A2;
 
+const boolean STARTUP_DELAY = true; // delay before countdown activates (for testing alone or remotely)
+
 // ---------- SENSOR CONSTANTS ---------- //
 const int BUFFER_LENGTH = 200;
 const int SENSITIVITY_VAL = 60;
@@ -149,6 +151,11 @@ void loop()
 
     case(STATE_COUNTDOWN):
     {
+      if(STARTUP_DELAY)
+      {
+        performCountdownDelay(); 
+      }
+
       resetVoltageBuffers();
       displayTimerRunning();
       currentState = STATE_TIMER_RUNNING;
@@ -291,13 +298,13 @@ long monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
-//            Serial.println("--- TRAP FOUND ---");
-//            Serial.print("Trap Time: ");
-//            Serial.println(trapTime);
-//            Serial.print("Trap Samples: ");
-//            Serial.println(totalTrapSamples);
-//            Serial.print("End Samples: ");
-//            Serial.println(totalEndSamples);
+            //            Serial.println("--- TRAP FOUND ---");
+            //            Serial.print("Trap Time: ");
+            //            Serial.println(trapTime);
+            //            Serial.print("Trap Samples: ");
+            //            Serial.println(totalTrapSamples);
+            //            Serial.print("End Samples: ");
+            //            Serial.println(totalEndSamples);
             trapTriggered = true;
             break;
           }
@@ -355,6 +362,39 @@ long monitorSensors() // returns end time in millis
   }
 
   return millis();
+}
+
+void performCountdownDelay()
+{
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  delay(30000);
+
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(500);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  delay(30000);
+
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(500);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(500);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(500);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  delay(30000);
 }
 
 
@@ -550,6 +590,12 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
+
+
+
+
+
+
 
 
 
