@@ -82,7 +82,7 @@ unsigned long totalTrapSamples = 0;
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(PIN_RED_ARCADE_BUTTON, INPUT);
   digitalWrite(PIN_RED_ARCADE_BUTTON, HIGH);  //sets pullup resistor
 
@@ -291,13 +291,13 @@ long monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
-            Serial.println("--- TRAP FOUND ---");
-            Serial.print("Trap Time: ");
-            Serial.println(trapTime);
-            Serial.print("Trap Samples: ");
-            Serial.println(totalTrapSamples);
-            Serial.print("End Samples: ");
-            Serial.println(totalEndSamples);
+//            Serial.println("--- TRAP FOUND ---");
+//            Serial.print("Trap Time: ");
+//            Serial.println(trapTime);
+//            Serial.print("Trap Samples: ");
+//            Serial.println(totalTrapSamples);
+//            Serial.print("End Samples: ");
+//            Serial.println(totalEndSamples);
             trapTriggered = true;
             break;
           }
