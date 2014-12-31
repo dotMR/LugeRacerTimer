@@ -187,59 +187,60 @@ void loop()
         calcTrapTime = (float) elapsedTrap / 1000.0;
       }
 
-      Serial.println(" RACE RESULTS ");
-      Serial.print("startTime: ");
-      Serial.println(startTime);
-      Serial.print("trapTime: ");
-      Serial.println(trapTime);
-      Serial.print("endTime: ");
-      Serial.println(endTime);
-      Serial.print("calcTrapTime: ");
-      Serial.println(calcTrapTime);
-      Serial.print("calcRaceTime: ");
-      Serial.println(calcRaceTime);
-      Serial.print("Trap Samples: ");
-      Serial.println(totalTrapSamples);
-      Serial.print("End Samples: ");
-      Serial.println(totalEndSamples);
+//      Serial.println(" RACE RESULTS ");
+//      Serial.print("startTime: ");
+//      Serial.println(startTime);
+//      Serial.print("trapTime: ");
+//      Serial.println(trapTime);
+//      Serial.print("endTime: ");
+//      Serial.println(endTime);
+//      Serial.print("calcTrapTime: ");
+//      Serial.println(calcTrapTime);
+//      Serial.print("calcRaceTime: ");
+//      Serial.println(calcRaceTime);
+//      Serial.print("Trap Samples: ");
+//      Serial.println(totalTrapSamples);
+//      Serial.print("End Samples: ");
+//      Serial.println(totalEndSamples);
 
       // calculate miles per hour from inches per second
       // assuming trap sensor was triggered
       if(calcTrapTime != 0)
       {
         calcInchesPerSecond = (float) SENSOR_DISTANCE / calcTrapTime;
-        Serial.print("calcInchesPerSecond: ");
-        Serial.println(calcInchesPerSecond);
+//        Serial.print("calcInchesPerSecond: ");
+//        Serial.println(calcInchesPerSecond);
 
         calcMilesPerSecond = calcInchesPerSecond / (float) INCHES_PER_MILE;
-        Serial.print("calcMilesPerSecond: ");
-        Serial.println(calcMilesPerSecond);
+//        Serial.print("calcMilesPerSecond: ");
+//        Serial.println(calcMilesPerSecond);
 
         calcMPH = calcMilesPerSecond * (float) SECONDS_PER_HOUR;
-        Serial.print("calcMPH: ");
-        Serial.println(calcMPH);
+//        Serial.print("calcMPH: ");
+//        Serial.println(calcMPH);
       }
 
+      transmitResults();
       displayResults();
 
-      if(calcRaceTime <= 2)
-      {
-        Serial.print(" Time found: ");
-        Serial.println(calcRaceTime);
-        Serial.print(" At buffer value: ");
-        Serial.println(bufferIndex_finishLine);
-        Serial.print(" # of samples @ end: ");
-        Serial.println(totalEndSamples);
-
-        Serial.println("Buffer values: ");
-        for(int i=0;i<BUFFER_LENGTH;i++)
-        {
-          Serial.print("[");
-          Serial.print(i);
-          Serial.print("]: ");
-          Serial.println(voltageBuffer_finishLine[i]);
-        }
-      }
+//      if(calcRaceTime <= 2)
+//      {
+//        Serial.print(" Time found: ");
+//        Serial.println(calcRaceTime);
+//        Serial.print(" At buffer value: ");
+//        Serial.println(bufferIndex_finishLine);
+//        Serial.print(" # of samples @ end: ");
+//        Serial.println(totalEndSamples);
+//
+//        Serial.println("Buffer values: ");
+//        for(int i=0;i<BUFFER_LENGTH;i++)
+//        {
+//          Serial.print("[");
+//          Serial.print(i);
+//          Serial.print("]: ");
+//          Serial.println(voltageBuffer_finishLine[i]);
+//        }
+//      }
 
       currentState = STATE_WAITING_FOR_RESET;
       break;
