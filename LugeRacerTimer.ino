@@ -5,13 +5,12 @@
 // ----------------------------------------
 
 // ---------- PINS ---------- //
-const byte PIN_LCD1 = 2;  // used to drive LCD serial backpack
-const byte PIN_LCD2 = 3;  // // used to drive LCD serial backpack
+const byte PIN_SOFTWARE_TX = 3;  // used to drive serial display
+const byte PIN_SOFTWARE_RX = 2;  // used to drive serial display
 
 const byte PIN_RED_ARCADE_BUTTON = 4;  // main arcade button
 const byte PIN_GREEN_ARCADE_BUTTON = 5;  // main arcade button
 
-const byte PIN_MOMENTARY_BUTTON = 12;  // LCD user interface button
 const byte PIN_UI_POT_ANALOG = A4;  // LCD user interface selector potentiometer
 
 const byte PIN_BUZZER = 7;  // the beeper
@@ -45,7 +44,7 @@ const boolean RUN_EXPRESS = false;
 // ----------------------------------------
 
 byte currentState = 0; // maintains system state
-SoftwareSerial display(PIN_LCD1, PIN_LCD2); // RX, TX
+SoftwareSerial display(PIN_SOFTWARE_RX, PIN_SOFTWARE_TX); // RX, TX
 
 // For timing
 boolean timerRunning = false;
@@ -62,6 +61,8 @@ int bufferIndex = 0;
 int currentVoltageValue = 0;
 unsigned long totalVoltageValue = 0;
 
+char tempString[10];  // Will be used with sprintf to create strings
+
 void setup()
 {
   Serial.begin(9600);
@@ -70,9 +71,6 @@ void setup()
 
   pinMode(PIN_GREEN_ARCADE_BUTTON, INPUT);
   digitalWrite(PIN_GREEN_ARCADE_BUTTON, HIGH);  //sets pullup resistor
-
-  pinMode(PIN_MOMENTARY_BUTTON, INPUT);
-  digitalWrite(PIN_MOMENTARY_BUTTON, HIGH);  //sets pullup resistor
 
   pinMode(PIN_UI_POT_ANALOG, INPUT);
   pinMode(PIN_GREEN_LED, OUTPUT);
@@ -88,21 +86,23 @@ void setup()
   // Beep to announce ready
   blinkPin(PIN_BUZZER, 1, 200, false);
 
-  configureLCD();
+  configureDisplay();
 
-  refreshLCD();
-  displayEnterDiagnostic();
-  delay(1500);
+//  displayEnterDiagnostic();
+  delay(1000);
+  
+  displayTimerReady();
+  currentState = STATE_RACER_SELECTED;
 
-  // read button for diagnostic state
-  if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
-  {
-    currentState = STATE_DIAGNOSTIC;
-  } 
-  else {
-    displayTimerReady();
-    currentState = STATE_RACER_SELECTED;
-  }
+//  // read button for diagnostic state
+//  if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
+//  {
+//    currentState = STATE_DIAGNOSTIC;
+//  } 
+//  else {
+//    displayTimerReady();
+//    currentState = STATE_RACER_SELECTED;
+//  }
 }
 
 void loop()
@@ -111,7 +111,7 @@ void loop()
   {    
     case(STATE_DIAGNOSTIC):
     {
-      runDiagnosticLoop();
+//      runDiagnosticLoop();
       displayTimerReady();
       currentState = STATE_RACER_SELECTED;      
       break;
@@ -130,7 +130,7 @@ void loop()
     case(STATE_COUNTDOWN):
     {
       resetVoltageBuffers();
-      displayTimerRunning();
+      displayCountdown();
       currentState = STATE_TIMER_RUNNING;
       performCountdownSequence();
       break;
@@ -147,26 +147,36 @@ void loop()
     case(STATE_TIMER_STOPPED):
     {
       elapsedTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
+      Serial.println("elapsedTime");
+      Serial.println(elapsedTime);
+              
+      Serial.println("endTime - startTime");
+      Serial.println(endTime-startTime);
+      
+      sprintf(tempString, "%4d", (int)((endTime-startTime)/10));
+            
+      clearDisplay();
+      delay(100);
+      setDecimals(0b00000010);  // Sets digit 2 decimal on
+      display.print(tempString);
 
-      displayResults();
-
-      if(elapsedTime <= 2) {
-        Serial.print(" Time found: ");
-        Serial.println(elapsedTime);
-        Serial.print(" At buffer value: ");
-        Serial.println(bufferIndex);
-        Serial.print(" # of samples: ");
-        Serial.println(totalSamples);
-
-        Serial.println("Buffer values: ");
-        for(int i=0;i<BUFFER_LENGTH;i++)
-        {
-          Serial.print("[");
-          Serial.print(i);
-          Serial.print("]: ");
-          Serial.println(voltageValueBuffer[i]);
-        }
-      }
+//      if(elapsedTime <= 2) {
+//        Serial.print(" Time found: ");
+//        Serial.println(elapsedTime);
+//        Serial.print(" At buffer value: ");
+//        Serial.println(bufferIndex);
+//        Serial.print(" # of samples: ");
+//        Serial.println(totalSamples);
+//
+//        Serial.println("Buffer values: ");
+//        for(int i=0;i<BUFFER_LENGTH;i++)
+//        {
+//          Serial.print("[");
+//          Serial.print(i);
+//          Serial.print("]: ");
+//          Serial.println(voltageValueBuffer[i]);
+//        }
+//      }
 
       currentState = STATE_WAITING_FOR_RESET;
       break;
@@ -358,71 +368,71 @@ void resetVoltageBuffers()
 
 }
 
-void runDiagnosticLoop()
-{
-  displayDiagnosticMode();
-  blinkPin(PIN_BUZZER, 5, 50, true);
-
-  // Flash bright LEDs
-  for(int i = 3; i > 0; i--)
-  {
-    digitalWrite(PIN_GREEN_LED, HIGH);
-    digitalWrite(PIN_RED_LED1, HIGH);
-    digitalWrite(PIN_RED_LED2, HIGH);
-    digitalWrite(PIN_RED_LED3, HIGH);
-    delay(250);
-    digitalWrite(PIN_GREEN_LED, LOW);
-    digitalWrite(PIN_RED_LED1, LOW);
-    digitalWrite(PIN_RED_LED2, LOW);
-    digitalWrite(PIN_RED_LED3, LOW);
-    delay(250);
-  }
-
-  long monitorLoopCount = 0;
-  resetVoltageBuffers();
-
-  // Listen for arcade button to escape the diagnostic state
-  while(digitalRead(PIN_GREEN_ARCADE_BUTTON) != LOW)
-  {
-    currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
-
-    if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
-    {
-      blinkPin(PIN_BUZZER, 3, 100, false);
-      lcdPrintLine2(currentVoltageValue);
-      lcdPrintLine3(avgVoltageValue);
-      resetVoltageBuffers();
-      delay(3000);
-      blinkPin(PIN_BUZZER, 1, 100, false);      
-    }
-    else
-    {
-      voltageValueBuffer[bufferIndex] = currentVoltageValue;
-
-      totalVoltageValue = 0;
-
-      for(int i=0;i<BUFFER_LENGTH;i++)
-      {
-        totalVoltageValue+=voltageValueBuffer[i];
-      }
-
-      avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
-
-      bufferIndex++;
-      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
-    }
-
-    if(monitorLoopCount++ >= 750)
-    {
-      // display analog sensor values
-      lcdPrintLine2(currentVoltageValue);
-      lcdPrintLine3(avgVoltageValue);
-      monitorLoopCount = 0;
-    }
-  }
-
-  blinkPin(PIN_BUZZER, 5, 50, true);
-}
+//void runDiagnosticLoop()
+//{
+//  displayDiagnosticMode();
+//  blinkPin(PIN_BUZZER, 5, 50, true);
+//
+//  // Flash bright LEDs
+//  for(int i = 3; i > 0; i--)
+//  {
+//    digitalWrite(PIN_GREEN_LED, HIGH);
+//    digitalWrite(PIN_RED_LED1, HIGH);
+//    digitalWrite(PIN_RED_LED2, HIGH);
+//    digitalWrite(PIN_RED_LED3, HIGH);
+//    delay(250);
+//    digitalWrite(PIN_GREEN_LED, LOW);
+//    digitalWrite(PIN_RED_LED1, LOW);
+//    digitalWrite(PIN_RED_LED2, LOW);
+//    digitalWrite(PIN_RED_LED3, LOW);
+//    delay(250);
+//  }
+//
+//  long monitorLoopCount = 0;
+//  resetVoltageBuffers();
+//
+//  // Listen for arcade button to escape the diagnostic state
+//  while(digitalRead(PIN_GREEN_ARCADE_BUTTON) != LOW)
+//  {
+//    currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
+//
+//    if(abs(currentVoltageValue-avgVoltageValue) > SENSITIVITY_VAL)
+//    {
+//      blinkPin(PIN_BUZZER, 3, 100, false);
+//      lcdPrintLine2(currentVoltageValue);
+//      lcdPrintLine3(avgVoltageValue);
+//      resetVoltageBuffers();
+//      delay(3000);
+//      blinkPin(PIN_BUZZER, 1, 100, false);      
+//    }
+//    else
+//    {
+//      voltageValueBuffer[bufferIndex] = currentVoltageValue;
+//
+//      totalVoltageValue = 0;
+//
+//      for(int i=0;i<BUFFER_LENGTH;i++)
+//      {
+//        totalVoltageValue+=voltageValueBuffer[i];
+//      }
+//
+//      avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
+//
+//      bufferIndex++;
+//      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
+//    }
+//
+//    if(monitorLoopCount++ >= 750)
+//    {
+//      // display analog sensor values
+//      lcdPrintLine2(currentVoltageValue);
+//      lcdPrintLine3(avgVoltageValue);
+//      monitorLoopCount = 0;
+//    }
+//  }
+//
+//  blinkPin(PIN_BUZZER, 5, 50, true);
+//}
 
 void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
 {
