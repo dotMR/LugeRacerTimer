@@ -27,12 +27,6 @@ void configureDisplay()
   clearDisplay();
 }
 
-//void sendCommand(byte command)
-//{
-//  display.write(FLAG_CMD_OPERATION); // command flag
-//  display.write(command);
-//}
-
 //  This will clear the display and reset the cursor
 void clearDisplay()
 {
@@ -71,13 +65,6 @@ void displayCountdown()
   clearDisplay();
   display.print(3210); 
 }
-
-//void displayTimerRunning(int timeTenths)
-//{
-//  clearDisplay();
-//  setDecimals(0b00000100);  // Sets digit 3 decimal on
-//  display.print(timeTenths);
-//}
 
 void displayResults(int timeTenths)
 {
