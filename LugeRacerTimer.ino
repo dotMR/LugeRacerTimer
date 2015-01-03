@@ -20,7 +20,6 @@ const byte PIN_RED_LED2 = 10;  // blinding red LED; a PWM pin
 const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 
 const byte PIN_SENSOR_ANALOG1 = A0;
-const byte PIN_SENSOR_ANALOG2 = A1;
 
 // ---------- SENSOR CONSTANTS ---------- //
 const int BUFFER_LENGTH = 200;
@@ -76,7 +75,6 @@ void setup()
   pinMode(PIN_RED_LED3, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_SENSOR_ANALOG1, INPUT);
-  pinMode(PIN_SENSOR_ANALOG2, INPUT);
 
   blinkPin(PIN_BUZZER, 1, 200, false); // announce startup
 
