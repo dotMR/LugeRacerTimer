@@ -70,11 +70,3 @@ void displayCountdown()
   display.print(3210);
 }
 
-void displayResults(int timeTenths)
-{
-  clearDisplay();
-  delay(100);
-  setDecimals(0b00000100);  // Sets digit 3 decimal on
-  display.print(timeTenths);
-}
-

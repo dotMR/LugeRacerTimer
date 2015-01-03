@@ -37,6 +37,7 @@ const byte STATE_TIMER_RUNNING = 5;
 const byte STATE_TIMER_STOPPED = 6;
 const byte STATE_WAITING_FOR_RESET = 7;
 
+
 // ----------------------------------------
 // Variables
 // ----------------------------------------
@@ -48,7 +49,6 @@ SoftwareSerial display(PIN_SOFTWARE_RX, PIN_SOFTWARE_TX); // RX, TX
 boolean timerRunning = false;
 unsigned long startTime;  // the time in millis at the time the system tells a racer to go
 unsigned long endTime;  // the time in millis that a "finish line" trigger event is received
-float elapsedTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
 
 unsigned long totalSamples = 0;
 
@@ -125,14 +125,7 @@ void loop()
 
     case(STATE_TIMER_STOPPED):
     {
-      elapsedTime = (((float)endTime) - ((float)startTime)) / ((float)1000.0);
-      Serial.println("elapsedTime");
-      Serial.println(elapsedTime);
-              
-      Serial.println("endTime - startTime");
-      Serial.println(endTime-startTime);
-      
-      sprintf(tempString, "%4d", (int)((endTime-startTime)/10));
+      sprintf(tempString, "%4d", getElapsedTime());
             
       clearDisplay();
       delay(100);
@@ -351,6 +344,11 @@ void runDiagnostics()
   }
 
   blinkPin(PIN_BUZZER, 5, 50, true);
+}
+
+int getElapsedTime()
+{
+  return (int)((endTime-startTime)/10);
 }
 
 void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
