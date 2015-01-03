@@ -37,8 +37,6 @@ const byte STATE_TIMER_RUNNING = 5;
 const byte STATE_TIMER_STOPPED = 6;
 const byte STATE_WAITING_FOR_RESET = 7;
 
-const boolean RUN_EXPRESS = false;
-
 // ----------------------------------------
 // Variables
 // ----------------------------------------
@@ -100,7 +98,7 @@ void loop()
   {
     case(STATE_READY):
     {
-      if(RUN_EXPRESS || digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
+      if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
       {
         blinkPin(PIN_BUZZER, 1, 100, true);
         currentState = STATE_COUNTDOWN;
@@ -147,7 +145,7 @@ void loop()
 
     case(STATE_WAITING_FOR_RESET):
     {
-      if(RUN_EXPRESS || digitalRead(PIN_GREEN_ARCADE_BUTTON) == LOW)
+      if(digitalRead(PIN_GREEN_ARCADE_BUTTON) == LOW)
       {
         blinkPin(PIN_BUZZER, 1, 100, false);
         displayTimerReady();
@@ -217,7 +215,7 @@ long monitorEndSensor() // returns trap time in millis
       bufferIndex++;
       if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
 
-      if(RUN_EXPRESS && (totalSamples > 5000)) 
+      if(totalSamples > 5000)
         trigger = true;
     }
   }
