@@ -21,10 +21,7 @@ void configureDisplay()
 {
   display.begin(9600);
   clearDisplay();
-  setBrightness(175);  // Medium brightness
-  display.print("SBLA");
-  delay(500);
-  clearDisplay();
+  setBrightness(225);  // Highest brightness
 }
 
 //  This will clear the display and reset the cursor
@@ -53,17 +50,24 @@ void setDecimals(byte decimals)
   display.write(decimals);
 }
 
+void displayDiagnosticsMode()
+{
+  clearDisplay();
+  delay(250);
+  display.print("diag");
+}
+
 void displayTimerReady()
 {
   clearDisplay();
   delay(250);
-  display.print("RDY");
+  display.print("rdy");
 }
 
 void displayCountdown()
 {
   clearDisplay();
-  display.print(3210); 
+  display.print(3210);
 }
 
 void displayResults(int timeTenths)
