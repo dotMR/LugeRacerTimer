@@ -19,8 +19,6 @@ const byte PIN_RED_LED1 = 9;  // blinding red LED; a PWM pin
 const byte PIN_RED_LED2 = 10;  // blinding red LED; a PWM pin
 const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 
-const byte PIN_LED =  13;  // the built-in debugging LED
-
 const byte PIN_SENSOR_ANALOG1 = A0;
 const byte PIN_SENSOR_ANALOG2 = A1;
 
@@ -77,7 +75,6 @@ void setup()
   pinMode(PIN_RED_LED2, OUTPUT);
   pinMode(PIN_RED_LED3, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED, OUTPUT);
   pinMode(PIN_SENSOR_ANALOG1, INPUT);
   pinMode(PIN_SENSOR_ANALOG2, INPUT);
 
