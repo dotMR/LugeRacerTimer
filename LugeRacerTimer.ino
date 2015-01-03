@@ -126,11 +126,10 @@ void loop()
     case(STATE_TIMER_STOPPED):
     {
       sprintf(tempString, "%4d", getElapsedTime());
-            
+
       clearDisplay();
-      delay(100);
-      setDecimals(0b00000010);  // Sets digit 2 decimal on
-      display.print(tempString);
+      delay(250);
+      display.print(tempString); // digit 2 decimal already set
 
       currentState = STATE_WAITING_FOR_RESET;
       break;
@@ -160,8 +159,20 @@ long monitorEndSensor() // returns trap time in millis
 {
   boolean trigger = false;
   totalSamples = 0;
+
+  clearDisplay();
+  setDecimals(0b00000010);  // Sets digit 2 decimal on
+
   while(!trigger)
   {
+    if((totalSamples % 100) == 0)
+    {
+      endTime = millis();
+      sprintf(tempString, "%4d", getElapsedTime());
+
+      display.print(tempString);
+    }
+
     currentVoltageValue = analogRead(PIN_SENSOR_ANALOG1);
     totalSamples++;
 
@@ -206,10 +217,7 @@ long monitorEndSensor() // returns trap time in millis
       avgVoltageValue = totalVoltageValue / BUFFER_LENGTH;
 
       bufferIndex++;
-      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;  
-
-      if(totalSamples > 5000)
-        trigger = true;
+      if(bufferIndex >= BUFFER_LENGTH) bufferIndex = 0;
     }
   }
   return millis();
@@ -223,80 +231,80 @@ void performCountdownSequence()
 { 
   digitalWrite(PIN_RED_LED3, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED3, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_BUZZER, HIGH);
 
   startTime = millis();
 
+  digitalWrite(PIN_GREEN_LED, HIGH);
+  digitalWrite(PIN_BUZZER, HIGH);
   delay(1500);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);

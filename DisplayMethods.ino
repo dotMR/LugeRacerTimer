@@ -54,14 +54,14 @@ void displayDiagnosticsMode()
 {
   clearDisplay();
   delay(250);
-  display.print("diag");
+  display.print("DIAG");
 }
 
 void displayTimerReady()
 {
   clearDisplay();
   delay(250);
-  display.print("rdy");
+  display.print("RDY");
 }
 
 void displayCountdown()
