@@ -5,13 +5,12 @@
 // ----------------------------------------
 
 // ---------- PINS ---------- //
-const byte PIN_LCD1 = 2;  // used to drive LCD serial backpack
-const byte PIN_LCD2 = 3;  // // used to drive LCD serial backpack
+const byte PIN_SOFTWARE_TX = 3;  // used to drive serial display
+const byte PIN_SOFTWARE_RX = 2;  // used to drive serial display
 
 const byte PIN_RED_ARCADE_BUTTON = 4;  // main arcade button
 const byte PIN_GREEN_ARCADE_BUTTON = 5;  // main arcade button
 
-const byte PIN_MOMENTARY_BUTTON = 12;  // LCD user interface button
 const byte PIN_UI_POT_ANALOG = A4;  // LCD user interface selector potentiometer
 
 const byte PIN_BUZZER = 7;  // the beeper
@@ -20,44 +19,49 @@ const byte PIN_RED_LED1 = 9;  // blinding red LED; a PWM pin
 const byte PIN_RED_LED2 = 10;  // blinding red LED; a PWM pin
 const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 
-const byte PIN_LED =  13;  // the built-in debugging LED
-
 const byte PIN_END_SENSOR = A0;
 const byte PIN_TRAP_SENSOR = A2;
 
-const boolean STARTUP_DELAY = true; // delay before countdown activates (for testing alone or remotely)
+const boolean STARTUP_DELAY = false; // delay before countdown activates (for testing alone or remotely)
 
 // ---------- SENSOR CONSTANTS ---------- //
 const int BUFFER_LENGTH = 200;
 const int SENSITIVITY_VAL = 60;
 const int NUM_READS_REQUIRED = 5;
 
-const int SENSOR_DISTANCE = 52; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
+const int SENSOR_DISTANCE = 38; // the distance between the trap and end sensor in inches.  Used for calculating trap speed.
 const long INCHES_PER_MILE = 63360;
 const long SECONDS_PER_HOUR = 3600;
 
 // ---------- STATES ---------- //
 const byte STATE_DIAGNOSTIC = 1;
-const byte STATE_RACER_SELECTED = 3;
+const byte STATE_READY = 3;
 const byte STATE_COUNTDOWN = 4;
 const byte STATE_TIMER_RUNNING = 5;
 const byte STATE_TIMER_STOPPED = 6;
 const byte STATE_WAITING_FOR_RESET = 7;
 
-const boolean RUN_EXPRESS = false;
+// ---------- DISPLAY ---------- //
+const int DISPLAY_RESULT_TIME = 0;
+const int DISPLAY_RESULT_SPEED = 1;
+const long RESULTS_DISPLAY_TIME = 1500; // ms between time and speed display in results
 
 // ----------------------------------------
 // Variables
 // ----------------------------------------
 
 byte currentState = 0; // maintains system state
-SoftwareSerial display(PIN_LCD1, PIN_LCD2); // RX, TX
+SoftwareSerial display(PIN_SOFTWARE_RX, PIN_SOFTWARE_TX); // RX, TX
 
 // For timing
 boolean timerRunning = false;
+
 unsigned long startTime;  // the time in millis when the system tells a racer to go (green light)
 unsigned long trapTime; // the time in millis when the trap event is received
 unsigned long endTime;  // the time in millis the finish event is received
+
+unsigned long lastDisplayUpdate = 0;  // the time in millis the finish event is received
+int lastResultDisplayed = DISPLAY_RESULT_SPEED;
 
 float calcTrapTime;  // the elapsed time between the trap sensor and finish line
 float calcRaceTime;  // the elapsed time between the racer go signal and the "finish line" trigger event
@@ -82,17 +86,18 @@ int currentVoltage_trap = 0;
 unsigned long bufferSum_trap = 0;
 unsigned long totalTrapSamples = 0;
 
+char tempTimeString[10];  // Will be used with sprintf to create strings
+char tempSpeedString[10];  // Will be used with sprintf to create strings
+
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
+
   pinMode(PIN_RED_ARCADE_BUTTON, INPUT);
   digitalWrite(PIN_RED_ARCADE_BUTTON, HIGH);  //sets pullup resistor
 
   pinMode(PIN_GREEN_ARCADE_BUTTON, INPUT);
   digitalWrite(PIN_GREEN_ARCADE_BUTTON, HIGH);  //sets pullup resistor
-
-  pinMode(PIN_MOMENTARY_BUTTON, INPUT);
-  digitalWrite(PIN_MOMENTARY_BUTTON, HIGH);  //sets pullup resistor
 
   pinMode(PIN_UI_POT_ANALOG, INPUT);
   pinMode(PIN_GREEN_LED, OUTPUT);
@@ -100,48 +105,28 @@ void setup()
   pinMode(PIN_RED_LED2, OUTPUT);
   pinMode(PIN_RED_LED3, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
 
   pinMode(PIN_END_SENSOR, INPUT);
   pinMode(PIN_TRAP_SENSOR, INPUT);
 
-  // Beep to announce ready
-  blinkPin(PIN_BUZZER, 1, 200, false);
+  blinkPin(PIN_BUZZER, 1, 200, false); // announce startup
 
-  configureLCD();
+  configureDisplay();
 
-  refreshLCD();
-  displayEnterDiagnostic();
-  delay(1500);
+  runDiagnostics();
+  
+  displayTimerReady();
 
-  // read button for diagnostic state
-  if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
-  {
-    currentState = STATE_DIAGNOSTIC;
-  } 
-  else
-  {
-    displayTimerReady();
-    currentState = STATE_RACER_SELECTED;
-  }
+  currentState = STATE_READY;
 }
 
 void loop()
 {
   switch(currentState)
-  {    
-    case(STATE_DIAGNOSTIC):
+  {
+    case(STATE_READY):
     {
-      runDiagnosticLoop();
-      displayTimerReady();
-      currentState = STATE_RACER_SELECTED;      
-      break;
-    }
-
-    case(STATE_RACER_SELECTED):
-    {
-      if(RUN_EXPRESS || digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
+      if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
       {
         blinkPin(PIN_BUZZER, 1, 100, true);
         currentState = STATE_COUNTDOWN;
@@ -155,9 +140,10 @@ void loop()
       {
         performCountdownDelay(); 
       }
+      
+      resetTimer();
 
-      resetVoltageBuffers();
-      displayTimerRunning();
+      displayCountdown();
       currentState = STATE_TIMER_RUNNING;
       performCountdownSequence();
       break;
@@ -165,7 +151,7 @@ void loop()
 
     case(STATE_TIMER_RUNNING):
     {
-      endTime = monitorSensors();
+      monitorSensors(); // loop watching for sensors to be triggered
       blinkPin(PIN_BUZZER, 2, 100, true);
       currentState = STATE_TIMER_STOPPED;
       break;
@@ -173,74 +159,8 @@ void loop()
 
     case(STATE_TIMER_STOPPED):
     {
-      long elapsedTime = (endTime - startTime);
-      calcRaceTime = (float) elapsedTime / 1000.0;
-
-      calcTrapTime = 0;
-      calcMPH = 0;
-      calcInchesPerSecond = 0;
-      calcMilesPerSecond = 0;
-
-      if(trapTime != 0)
-      {
-        long elapsedTrap = (endTime - trapTime);
-        calcTrapTime = (float) elapsedTrap / 1000.0;
-      }
-
-//      Serial.println(" RACE RESULTS ");
-//      Serial.print("startTime: ");
-//      Serial.println(startTime);
-//      Serial.print("trapTime: ");
-//      Serial.println(trapTime);
-//      Serial.print("endTime: ");
-//      Serial.println(endTime);
-//      Serial.print("calcTrapTime: ");
-//      Serial.println(calcTrapTime);
-//      Serial.print("calcRaceTime: ");
-//      Serial.println(calcRaceTime);
-//      Serial.print("Trap Samples: ");
-//      Serial.println(totalTrapSamples);
-//      Serial.print("End Samples: ");
-//      Serial.println(totalEndSamples);
-
-      // calculate miles per hour from inches per second
-      // assuming trap sensor was triggered
-      if(calcTrapTime != 0)
-      {
-        calcInchesPerSecond = (float) SENSOR_DISTANCE / calcTrapTime;
-//        Serial.print("calcInchesPerSecond: ");
-//        Serial.println(calcInchesPerSecond);
-
-        calcMilesPerSecond = calcInchesPerSecond / (float) INCHES_PER_MILE;
-//        Serial.print("calcMilesPerSecond: ");
-//        Serial.println(calcMilesPerSecond);
-
-        calcMPH = calcMilesPerSecond * (float) SECONDS_PER_HOUR;
-//        Serial.print("calcMPH: ");
-//        Serial.println(calcMPH);
-      }
-
-      transmitResults();
-      displayResults();
-
-//      if(calcRaceTime <= 2)
-//      {
-//        Serial.print(" Time found: ");
-//        Serial.println(calcRaceTime);
-//        Serial.print(" At buffer value: ");
-//        Serial.println(bufferIndex_finishLine);
-//        Serial.print(" # of samples @ end: ");
-//        Serial.println(totalEndSamples);
-//
-//        Serial.println("Buffer values: ");
-//        for(int i=0;i<BUFFER_LENGTH;i++)
-//        {
-//          Serial.print("[");
-//          Serial.print(i);
-//          Serial.print("]: ");
-//          Serial.println(voltageBuffer_finishLine[i]);
-//        }
-//      }
+      sprintf(tempTimeString, "%4d", getElapsedTime());
+      sprintf(tempSpeedString, "%4d", getSpeed());
 
       currentState = STATE_WAITING_FOR_RESET;
       break;
@@ -248,13 +168,43 @@ void loop()
 
     case(STATE_WAITING_FOR_RESET):
     {
-      if(RUN_EXPRESS || digitalRead(PIN_GREEN_ARCADE_BUTTON) == LOW)
+      if(digitalRead(PIN_GREEN_ARCADE_BUTTON) == LOW)
       {
         blinkPin(PIN_BUZZER, 1, 100, false);
         displayTimerReady();
-        currentState = STATE_RACER_SELECTED; 
+        currentState = STATE_READY;
+        break;
       }
-      break; 
+
+      unsigned long now = millis();
+
+      if((now - lastDisplayUpdate) > RESULTS_DISPLAY_TIME)
+      {
+        lastDisplayUpdate = now;
+        
+        if(lastResultDisplayed == DISPLAY_RESULT_SPEED)
+        {
+          //display time
+          clearDisplay();
+          displayWait();
+          setDecimals(0b00010000);  // Sets colon on
+          displayWait();
+          display.print(tempTimeString);
+          lastResultDisplayed = DISPLAY_RESULT_TIME;
+        }
+        else
+        {
+          //display speed
+          clearDisplay();
+          displayWait();
+          setDecimals(0b00000010);  // Sets digit 2 decimal on
+          displayWait();
+          display.print(tempSpeedString);
+          lastResultDisplayed = DISPLAY_RESULT_SPEED;
+        }
+      }
+
+      break;
     }
   }
 
@@ -265,8 +215,12 @@ void loop()
 // ----------------------------------------
 // Polling Methods
 // ----------------------------------------
-long monitorSensors() // returns end time in millis
+void monitorSensors() // returns end time in millis
 {
+  clearDisplay();
+  displayWait();
+  setDecimals(0b00010000);  // Sets colon on
+
   boolean endTriggered = false;
   boolean trapTriggered = false;
   boolean exit = false;
@@ -280,6 +234,13 @@ long monitorSensors() // returns end time in millis
 
   while(!exit)
   {
+    if((totalEndSamples % 100) == 0) // keep running stopwatch time
+    {
+      endTime = millis();
+      sprintf(tempTimeString, "%4d", getElapsedTime());
+      display.print(tempTimeString);
+    }
+    
     if(!trapTriggered)
     {
       // watch trap sensor for consecutive reads
@@ -299,19 +260,15 @@ long monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
-            //            Serial.println("--- TRAP FOUND ---");
-            //            Serial.print("Trap Time: ");
-            //            Serial.println(trapTime);
-            //            Serial.print("Trap Samples: ");
-            //            Serial.println(totalTrapSamples);
-            //            Serial.print("End Samples: ");
-            //            Serial.println(totalEndSamples);
+            digitalWrite(PIN_BUZZER, HIGH); // announce trap
             trapTriggered = true;
             break;
           }
         }
         else
+        {
           break;
+        }
       }
 
       // recalculate avg voltage if still monitoring sensor
@@ -341,13 +298,16 @@ long monitorSensors() // returns end time in millis
       {
         if(i==NUM_READS_REQUIRED)
         {
-          exit = true;
+          endTime = millis();
           endTriggered = true;
+          exit = true;
           break;
         }
       }
       else
+      {
         break;
+      }
     }
 
     if(!endTriggered)
@@ -361,8 +321,6 @@ long monitorSensors() // returns end time in millis
       avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
     }
   }
-
-  return millis();
 }
 
 void performCountdownDelay()
@@ -406,84 +364,90 @@ void performCountdownSequence()
 { 
   digitalWrite(PIN_RED_LED3, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED3, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_BUZZER, HIGH);
-
   delay(500);
+
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(500);
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_BUZZER, HIGH);
 
   startTime = millis();
 
+  digitalWrite(PIN_GREEN_LED, HIGH);
+  digitalWrite(PIN_BUZZER, HIGH);
   delay(1500);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_BUZZER, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, HIGH);
   digitalWrite(PIN_RED_LED1, HIGH);
   digitalWrite(PIN_RED_LED2, HIGH);
   digitalWrite(PIN_RED_LED3, HIGH);
-
   delay(250);
+
   digitalWrite(PIN_GREEN_LED, LOW);
   digitalWrite(PIN_RED_LED1, LOW);
   digitalWrite(PIN_RED_LED2, LOW);
   digitalWrite(PIN_RED_LED3, LOW);
+}
+
+void resetTimer()
+{
+  lastResultDisplayed = DISPLAY_RESULT_SPEED; // always show time first
+  resetVoltageBuffers();
 }
 
 void resetVoltageBuffers()
@@ -508,9 +472,10 @@ void resetVoltageBuffers()
   avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
 }
 
-void runDiagnosticLoop()
+void runDiagnostics()
 {
-  displayDiagnosticMode();
+  displayDiagnosticsMode();
+
   blinkPin(PIN_BUZZER, 5, 50, true);
 
   // Flash bright LEDs
@@ -528,50 +493,43 @@ void runDiagnosticLoop()
     delay(250);
   }
 
-  long monitorLoopCount = 0;
-  resetVoltageBuffers();
+  blinkPin(PIN_BUZZER, 5, 50, true);
+}
 
-  // Listen for arcade button to escape the diagnostic state
-  while(digitalRead(PIN_GREEN_ARCADE_BUTTON) != LOW)
+int getElapsedTime()
+{
+  return (int)((endTime-startTime)/10);
+}
+
+int getSpeed()
+{
+  calcTrapTime = 0;
+  calcMPH = 0;
+  calcInchesPerSecond = 0;
+  calcMilesPerSecond = 0;
+
+  if(trapTime != 0)
   {
-    currentVoltage_finishLine = analogRead(PIN_END_SENSOR);
-
-    if(abs(currentVoltage_finishLine-avgVoltage_finishLine) > SENSITIVITY_VAL)
-    {
-      blinkPin(PIN_BUZZER, 3, 100, false);
-      lcdPrintLine2(currentVoltage_finishLine);
-      lcdPrintLine3(avgVoltage_finishLine);
-      resetVoltageBuffers();
-      delay(3000);
-      blinkPin(PIN_BUZZER, 1, 100, false);      
-    }
-    else
-    {
-      voltageBuffer_finishLine[bufferIndex_finishLine] = currentVoltage_finishLine;
-
-      bufferSum_finishLine = 0;
-
-      for(int i=0;i<BUFFER_LENGTH;i++)
-      {
-        bufferSum_finishLine+=voltageBuffer_finishLine[i];
-      }
-
-      avgVoltage_finishLine = bufferSum_finishLine / BUFFER_LENGTH;
-
-      bufferIndex_finishLine++;
-      if(bufferIndex_finishLine >= BUFFER_LENGTH) bufferIndex_finishLine = 0;  
-    }
-
-    if(monitorLoopCount++ >= 750)
-    {
-      // display analog sensor values
-      lcdPrintLine2(currentVoltage_finishLine);
-      lcdPrintLine3(avgVoltage_finishLine);
-      monitorLoopCount = 0;
-    }
+    long elapsedTrap = (endTime - trapTime);
+    calcTrapTime = (float) elapsedTrap / 1000.0;
+  }
+  else
+  {
+    return 0;
   }
 
-  blinkPin(PIN_BUZZER, 5, 50, true);
+  // calculate miles per hour from inches per second
+  // assuming trap sensor was triggered
+  if(calcTrapTime != 0)
+  {
+    calcInchesPerSecond = (float) SENSOR_DISTANCE / calcTrapTime;
+    calcMilesPerSecond = calcInchesPerSecond / (float) INCHES_PER_MILE;
+    calcMPH = calcMilesPerSecond * (float) SECONDS_PER_HOUR;
+    
+    return (int) (calcMPH * 100.0);
+  }
+ 
+  return 0;
 }
 
 void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
@@ -591,23 +549,6 @@ void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
     }
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
