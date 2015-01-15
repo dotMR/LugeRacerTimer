@@ -1,5 +1,5 @@
 ####TODO
-- are there any components on the xmas tree itself (or just a board to split out the wires)?
+- are there any components on the xmas tree itself (or just a board to split out the wires)? [RM: Just a dumb PCB to split out the wires and the LEDs themselves.]
 
 ####PARTS
 |name|use|qty|misc|
