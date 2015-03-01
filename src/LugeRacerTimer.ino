@@ -14,13 +14,15 @@ const byte PIN_GREEN_ARCADE_BUTTON = 5;  // main arcade button
 const byte PIN_UI_POT_ANALOG = A4;  // LCD user interface selector potentiometer
 
 const byte PIN_BUZZER = 7;  // the beeper
-const byte PIN_GREEN_LED = 6;  // blinding green LED; a PWM pin
-const byte PIN_RED_LED1 = 9;  // blinding red LED; a PWM pin
-const byte PIN_RED_LED2 = 10;  // blinding red LED; a PWM pin
-const byte PIN_RED_LED3 = 11;  // blinding red LED; a PWM pin
 
 const byte PIN_END_SENSOR = A0;
 const byte PIN_TRAP_SENSOR = A2;
+
+// Shift Register pins for controlling xmas tree
+// http://arduino.cc/en/Tutorial/ShiftOut
+const int PIN_LATCH = 8; //Pin connected to ST_CP
+const int PIN_CLK = 12; //Pin connected to SH_CP
+const int PIN_DATA = 11; //Pin connected to DS
 
 const boolean STARTUP_DELAY = false; // delay before countdown activates (for testing alone or remotely)
 
@@ -49,7 +51,6 @@ const long RESULTS_DISPLAY_TIME = 1500; // ms between time and speed display in 
 // ----------------------------------------
 // Variables
 // ----------------------------------------
-
 byte currentState = 0; // maintains system state
 SoftwareSerial display(PIN_SOFTWARE_RX, PIN_SOFTWARE_TX); // RX, TX
 
@@ -100,21 +101,25 @@ void setup()
   digitalWrite(PIN_GREEN_ARCADE_BUTTON, HIGH);  //sets pullup resistor
 
   pinMode(PIN_UI_POT_ANALOG, INPUT);
-  pinMode(PIN_GREEN_LED, OUTPUT);
-  pinMode(PIN_RED_LED1, OUTPUT);
-  pinMode(PIN_RED_LED2, OUTPUT);
-  pinMode(PIN_RED_LED3, OUTPUT);
+
   pinMode(PIN_BUZZER, OUTPUT);
 
   pinMode(PIN_END_SENSOR, INPUT);
   pinMode(PIN_TRAP_SENSOR, INPUT);
 
+  // Control the shift register (xmas tree)
+  pinMode(PIN_LATCH, OUTPUT);
+  pinMode(PIN_CLK, OUTPUT);
+  pinMode(PIN_DATA, OUTPUT);
+
   blinkPin(PIN_BUZZER, 1, 200, false); // announce startup
+
+  resetTree();
 
   configureDisplay();
 
   runDiagnostics();
-  
+
   displayTimerReady();
 
   currentState = STATE_READY;
@@ -210,7 +215,6 @@ void loop()
 
   delay(10);
 }
-
 
 // ----------------------------------------
 // Polling Methods
@@ -362,86 +366,62 @@ void performCountdownDelay()
 // ----------------------------------------
 void performCountdownSequence()
 { 
-  digitalWrite(PIN_RED_LED3, HIGH);
+  fireR1();
   digitalWrite(PIN_BUZZER, HIGH);
   delay(500);
 
-  digitalWrite(PIN_RED_LED3, LOW);
+  resetTree();
   digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
-  digitalWrite(PIN_RED_LED2, HIGH);
+  fireR2();
   digitalWrite(PIN_BUZZER, HIGH);
   delay(500);
 
-  digitalWrite(PIN_RED_LED2, LOW);
+  resetTree();
   digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
-  digitalWrite(PIN_RED_LED1, HIGH);
+  fireR3();
   digitalWrite(PIN_BUZZER, HIGH);
   delay(500);
 
-  digitalWrite(PIN_RED_LED1, LOW);
+  resetTree();
   digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
   startTime = millis();
 
-  digitalWrite(PIN_GREEN_LED, HIGH);
+  fireG1();
   digitalWrite(PIN_BUZZER, HIGH);
   delay(1500);
 
-  digitalWrite(PIN_GREEN_LED, LOW);
+  resetTree();
   digitalWrite(PIN_BUZZER, LOW);
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_RED_LED1, HIGH);
-  digitalWrite(PIN_RED_LED2, HIGH);
-  digitalWrite(PIN_RED_LED3, HIGH);
+  lightTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, LOW);
-  digitalWrite(PIN_RED_LED1, LOW);
-  digitalWrite(PIN_RED_LED2, LOW);
-  digitalWrite(PIN_RED_LED3, LOW);
+  resetTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_RED_LED1, HIGH);
-  digitalWrite(PIN_RED_LED2, HIGH);
-  digitalWrite(PIN_RED_LED3, HIGH);
+  lightTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, LOW);
-  digitalWrite(PIN_RED_LED1, LOW);
-  digitalWrite(PIN_RED_LED2, LOW);
-  digitalWrite(PIN_RED_LED3, LOW);
+  resetTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_RED_LED1, HIGH);
-  digitalWrite(PIN_RED_LED2, HIGH);
-  digitalWrite(PIN_RED_LED3, HIGH);
+  lightTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, LOW);
-  digitalWrite(PIN_RED_LED1, LOW);
-  digitalWrite(PIN_RED_LED2, LOW);
-  digitalWrite(PIN_RED_LED3, LOW);
+  resetTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, HIGH);
-  digitalWrite(PIN_RED_LED1, HIGH);
-  digitalWrite(PIN_RED_LED2, HIGH);
-  digitalWrite(PIN_RED_LED3, HIGH);
+  lightTree();
   delay(250);
 
-  digitalWrite(PIN_GREEN_LED, LOW);
-  digitalWrite(PIN_RED_LED1, LOW);
-  digitalWrite(PIN_RED_LED2, LOW);
-  digitalWrite(PIN_RED_LED3, LOW);
+  resetTree();
 }
 
 void resetTimer()
@@ -481,15 +461,9 @@ void runDiagnostics()
   // Flash bright LEDs
   for(int i = 3; i > 0; i--)
   {
-    digitalWrite(PIN_GREEN_LED, HIGH);
-    digitalWrite(PIN_RED_LED1, HIGH);
-    digitalWrite(PIN_RED_LED2, HIGH);
-    digitalWrite(PIN_RED_LED3, HIGH);
+    lightTree();
     delay(250);
-    digitalWrite(PIN_GREEN_LED, LOW);
-    digitalWrite(PIN_RED_LED1, LOW);
-    digitalWrite(PIN_RED_LED2, LOW);
-    digitalWrite(PIN_RED_LED3, LOW);
+    resetTree();
     delay(250);
   }
 
