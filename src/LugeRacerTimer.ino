@@ -112,7 +112,7 @@ void setup()
   pinMode(PIN_CLK, OUTPUT);
   pinMode(PIN_DATA, OUTPUT);
 
-  blinkPin(PIN_BUZZER, 1, 200, false); // announce startup
+  buzz(PIN_BUZZER, 1, 200, false); // announce startup
 
   resetTree();
 
@@ -133,7 +133,7 @@ void loop()
     {
       if(digitalRead(PIN_RED_ARCADE_BUTTON) == LOW)
       {
-        blinkPin(PIN_BUZZER, 1, 100, true);
+        buzz(PIN_BUZZER, 1, 100, true);
         currentState = STATE_COUNTDOWN;
       }
       break;
@@ -157,7 +157,7 @@ void loop()
     case(STATE_TIMER_RUNNING):
     {
       monitorSensors(); // loop watching for sensors to be triggered
-      blinkPin(PIN_BUZZER, 2, 100, true);
+      buzz(PIN_BUZZER, 2, 100, true);
       currentState = STATE_TIMER_STOPPED;
       break;
     }
@@ -175,7 +175,7 @@ void loop()
     {
       if(digitalRead(PIN_GREEN_ARCADE_BUTTON) == LOW)
       {
-        blinkPin(PIN_BUZZER, 1, 100, false);
+        buzz(PIN_BUZZER, 1, 100, false);
         displayTimerReady();
         currentState = STATE_READY;
         break;
@@ -264,7 +264,7 @@ void monitorSensors() // returns end time in millis
           if(i==NUM_READS_REQUIRED)
           {
             trapTime = millis();
-            digitalWrite(PIN_BUZZER, HIGH); // announce trap
+            buzz(PIN_BUZZER, 1, 250, false);
             trapTriggered = true;
             break;
           }
@@ -327,35 +327,23 @@ void monitorSensors() // returns end time in millis
   }
 }
 
+// TODO: test this again
 void performCountdownDelay()
 {
-  digitalWrite(PIN_BUZZER, HIGH);
+  buzz(PIN_BUZZER, 1, 500, false);
+  delay(30000);
+
+  buzz(PIN_BUZZER, 1, 500, false);
   delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
+  buzz(PIN_BUZZER, 1, 500, false);
 
   delay(30000);
 
-  digitalWrite(PIN_BUZZER, HIGH);
+  buzz(PIN_BUZZER, 1, 500, false);
   delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
+  buzz(PIN_BUZZER, 1, 500, false);
   delay(500);
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
-
-  delay(30000);
-
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
-  delay(500);
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
-  delay(500);
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-  digitalWrite(PIN_BUZZER, LOW);
+  buzz(PIN_BUZZER, 1, 500, false);
 
   delay(30000);
 }
@@ -367,37 +355,25 @@ void performCountdownDelay()
 void performCountdownSequence()
 { 
   fireR1();
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-
+  buzz(PIN_BUZZER, 1, 500, false);
   resetTree();
-  digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
   fireR2();
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-
+  buzz(PIN_BUZZER, 1, 500, false);
   resetTree();
-  digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
   fireR3();
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(500);
-
+  buzz(PIN_BUZZER, 1, 500, false);
   resetTree();
-  digitalWrite(PIN_BUZZER, LOW);
   delay(500);
 
   startTime = millis();
 
   fireG1();
-  digitalWrite(PIN_BUZZER, HIGH);
-  delay(1500);
-
+  buzz(PIN_BUZZER, 1, 1500, false);
   resetTree();
-  digitalWrite(PIN_BUZZER, LOW);
   delay(250);
 
   lightTree();
@@ -456,7 +432,7 @@ void runDiagnostics()
 {
   displayDiagnosticsMode();
 
-  blinkPin(PIN_BUZZER, 5, 50, true);
+  buzz(PIN_BUZZER, 5, 50, true);
 
   // Flash bright LEDs
   for(int i = 3; i > 0; i--)
@@ -467,7 +443,7 @@ void runDiagnostics()
     delay(250);
   }
 
-  blinkPin(PIN_BUZZER, 5, 50, true);
+  buzz(PIN_BUZZER, 5, 50, true);
 }
 
 int getElapsedTime()
@@ -506,20 +482,28 @@ int getSpeed()
   return 0;
 }
 
-void blinkPin(byte pin, int numFlashes, long blinkMillis, boolean trailingDelay)
-{
+// inspired by: http://www.faludi.com/itp/arduino/buzzer_example.pde
+void buzz(byte targetPin, int numFlashes, long buzzMillis, boolean trailingDelay) {
+  const long FREQUENCY = 2048;
+  const long DELAY_VALUE = 1000000 / FREQUENCY / 2; // delay between transitions (2 phases, 2048 Hz, in microseconds)
+  long numCycles = FREQUENCY * buzzMillis/ 1000; // number of cycles to produce (for proper timing)
+
   for(int i = numFlashes; i > 0; i--)
   {
-    digitalWrite(pin, HIGH);
-    delay(blinkMillis);
-    digitalWrite(PIN_BUZZER, LOW);
+    for (long j=0; j < numCycles; j++)
+    {
+      digitalWrite(PIN_BUZZER, HIGH);
+      delayMicroseconds(DELAY_VALUE);
+      digitalWrite(PIN_BUZZER, LOW);
+      delayMicroseconds(DELAY_VALUE);
+    }
     if(i > 1) // do the off delay if we have more than one blink left
     {
-      delay(blinkMillis);
+      delay(buzzMillis);
     }
     else if((i == 1) && trailingDelay)  // if we're on the last blink, only do an off delay if trailingDelay is true
     {
-      delay(blinkMillis);
+      delay(buzzMillis);
     }
   }
 }
