@@ -11,8 +11,6 @@ const byte PIN_SOFTWARE_RX = 2;  // used to drive serial display
 const byte PIN_RED_ARCADE_BUTTON = 4;  // main arcade button
 const byte PIN_GREEN_ARCADE_BUTTON = 5;  // main arcade button
 
-const byte PIN_UI_POT_ANALOG = A4;  // LCD user interface selector potentiometer
-
 const byte PIN_BUZZER = 7;  // the beeper
 
 const byte PIN_END_SENSOR = A0;
@@ -99,8 +97,6 @@ void setup()
 
   pinMode(PIN_GREEN_ARCADE_BUTTON, INPUT);
   digitalWrite(PIN_GREEN_ARCADE_BUTTON, HIGH);  //sets pullup resistor
-
-  pinMode(PIN_UI_POT_ANALOG, INPUT);
 
   pinMode(PIN_BUZZER, OUTPUT);
 
