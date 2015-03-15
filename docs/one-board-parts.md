@@ -26,8 +26,12 @@ http://www.jameco.com/Jameco/workshop/JamecoBuilds/arduinocircuit.html
 |Voltage Meter, 0-5V, externally powered (TODO: need link)|Sensor calibration|2|-|
 
 ####TODO
-- method to upload code? (USB / Xbee / socket for ATMega in-and-out)
-- add LED + resistor to Pin 13 for basic board testing using blink sketch?
+- how do we upload code to the custom board?
+  - expose USB-B port on the panel?
+  - mount an xBee on the boad for wireless upload? (added benefit of exposing a way to get data off it)
+  - expose FTDI pins on the panel?
+  - OR, just pull the chip off the socket when we need to reprogram?
+- Should we add an LED + resistor to Pin 13 for basic board testing using blink sketch?
 
 ####Sensor Stations
 
